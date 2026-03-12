@@ -26,6 +26,7 @@ export function registerTurnHandlers(socket: Socket) {
         } else {
             player.coins += 2;
             io.to(roomId).emit("play_animation", { type: "gain_coins", attackerName: player.name, amount: 2, targetName: player.name });
+            io.to(roomId).emit("chat_message", { sender: "Sistema", text: `🏛️ ${player.name} recolheu impostos e recebeu 2 moedas.` });
         }
 
         checkWinCondition(room);
@@ -47,6 +48,7 @@ export function registerTurnHandlers(socket: Socket) {
             io.to(socket.id).emit("play_animation", { type: "draw", attackerName: player.name, targetCard: drawnCard, targetName: player.name });
             // Public: others see a card is drawn without revealing its face
             io.to(roomId).except(socket.id).emit("play_animation", { type: "draw", attackerName: player.name, targetCard: null, targetName: player.name });
+            io.to(roomId).emit("chat_message", { sender: "Sistema", text: `🎴 ${player.name} buscou novos aliados no deck.` });
         }
         ensureVisibleCard(player);
         room.turnPhase = "action";

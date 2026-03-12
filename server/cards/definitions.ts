@@ -70,10 +70,19 @@ export const CARD_DEFINITIONS: Omit<Card, "id">[] = [
     { class: "República", name: "José Martí", description: "Ignora a ação de qualquer carta inimiga. Não pode ser bloqueado.", type: "defense", power: "block_unblockable", image: "/cards/República/Jose marti.webp" },
     { class: "República", name: "Júlio César", description: "Embaralha as cartas de algum jogador com o monte e redistribui. Bloqueado por Golpe Sorrateiro.", type: "attack", power: "shuffle_and_redistribute", image: "/cards/República/Julio Cesar.webp" },
     { class: "República", name: "Platão", description: "Revela uma carta de dois jogadores. Não pode ser bloqueado.", type: "special", power: "peek_two_opponents", image: "/cards/República/Platão.webp" },
+
+    // Anarquismo
+    { class: "Anarquismo", name: "Movimento Coletivista", description: "Redistribui as moedas de forma igualitária. Se faltar moedas, pega no monte. Bloqueado por Liberais Clássicos.", type: "special", power: "redistribute_coins", image: "/cards/Anarquismo/anarquismo.webp" },
+    { class: "Anarquismo", name: "Mikhail Bakunin", description: "Elimina uma carta de dois jogadores. Não pode ser bloqueado.", type: "attack", power: "eliminate_two_opponents", image: "/cards/Anarquismo/Bakunin.webp" },
+    { class: "Anarquismo", name: "Henry David Thoreau", description: "Ignora a ação de qualquer carta inimiga. Não pode ser bloqueado.", type: "defense", power: "block_unblockable", image: "/cards/Anarquismo/Henry David Thoreau.webp" },
 ];
 
 /** Generate a freshly shuffled deck with UUIDs assigned. */
-export function generateDeck(): Card[] {
-    return CARD_DEFINITIONS.map((def) => ({ id: uuidv4(), ...def }))
+export function generateDeck(expansionEnabled: boolean = true): Card[] {
+    let pool = CARD_DEFINITIONS;
+    if (!expansionEnabled) {
+        pool = pool.filter((c) => c.class !== "República" && c.class !== "Anarquismo");
+    }
+    return pool.map((def) => ({ id: uuidv4(), ...def }))
         .sort(() => Math.random() - 0.5);
 }

@@ -56,9 +56,18 @@ export function Lobby({ room, socket }: { room: Room; socket: Socket }) {
                             </div>
                         </div>
                     </div>
-                    <div className="flex items-center gap-2 text-stone-400 bg-stone-800 px-4 py-2 rounded-full">
-                        <Users className="w-5 h-5" />
-                        <span>{room.players.length} / {room.maxPlayers}</span>
+                    <div className="flex items-center gap-4">
+                        <div className={cn(
+                            "flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium",
+                            room.expansionEnabled ? "bg-amber-500/10 text-amber-500 border border-amber-500/20" : "bg-stone-800 text-stone-500 border border-stone-700"
+                        )}>
+                            <Play className="w-4 h-4" />
+                            <span>Expansão: {room.expansionEnabled ? "ON" : "OFF"}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-stone-400 bg-stone-800 px-4 py-2 rounded-full border border-stone-700">
+                            <Users className="w-5 h-5" />
+                            <span>{room.players.length} / {room.maxPlayers}</span>
+                        </div>
                     </div>
                 </div>
 
@@ -117,11 +126,28 @@ export function Lobby({ room, socket }: { room: Room; socket: Socket }) {
                 </div>
 
                 {isHost && (
-                    <div className="flex justify-center">
+                    <div className="flex flex-col items-center gap-6">
+                        <div className="flex items-center gap-3 bg-stone-800 p-4 rounded-xl border border-stone-700">
+                            <span className="text-stone-300 font-medium">Expansão (República & Anarquismo)</span>
+                            <button
+                                onClick={() => socket.emit("toggle_expansion", { roomId: room.id })}
+                                className={cn(
+                                    "relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none",
+                                    room.expansionEnabled ? "bg-amber-600" : "bg-stone-600"
+                                )}
+                            >
+                                <span
+                                    className={cn(
+                                        "inline-block h-4 w-4 transform rounded-full bg-white transition-transform",
+                                        room.expansionEnabled ? "translate-x-6" : "translate-x-1"
+                                    )}
+                                />
+                            </button>
+                        </div>
                         <button
                             onClick={() => socket.emit("start_game", { roomId: room.id })}
                             disabled={room.players.length < 2 || !allReady}
-                            className="flex items-center gap-2 bg-amber-600 hover:bg-amber-500 disabled:bg-stone-800 disabled:text-stone-500 disabled:cursor-not-allowed text-stone-900 font-bold py-4 px-8 rounded-xl text-lg transition-all"
+                            className="flex items-center gap-2 bg-amber-600 hover:bg-amber-500 disabled:bg-stone-800 disabled:text-stone-500 disabled:cursor-not-allowed text-stone-900 font-bold py-4 px-8 rounded-xl text-lg transition-all shadow-lg"
                         >
                             <Play className="w-6 h-6" />
                             Start Game

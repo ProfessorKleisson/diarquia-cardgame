@@ -62,8 +62,8 @@ export function checkCanBlock(defenseCard: Card, attackCard: Card): boolean {
     // Inquisição blocked by any Liberal card
     if (attackCard.name === "Inquisição" && defenseCard.class === "Liberais Clássicos") return true;
 
-    // Karl Marx blocked by Liberais Clássicos
-    if (attackCard.name === "Karl Marx" && defenseCard.class === "Liberais Clássicos") return true;
+    // Karl Marx / Movimento Coletivista blocked by Liberais Clássicos
+    if (attackCard.power === "redistribute_coins" && defenseCard.class === "Liberais Clássicos") return true;
 
     return false;
 }
@@ -89,18 +89,23 @@ export function applyCardEffect(room: Room, player: Player, card: Card, targetPl
     switch (card.power) {
         case "draw_7_coins":
             player.coins += 7;
+            let draw7Text = `💸 Financiamento de Império! ${player.name} recebeu 7 moedas através da autoridade de ${card.name}.`;
+            if (card.name === "Dom Pedro II") draw7Text = `💸 Estabilidade Imperial! Dom Pedro II garantiu 7 moedas para a manutenção do poder.`;
+
             io.to(room.id).emit("play_animation", { type: "gain_coins", attackerName: player.name, amount: 7, targetName: player.name });
+            io.to(room.id).emit("chat_message", { sender: "Sistema", text: draw7Text });
             break;
 
         case "draw_3_coins_unblockable":
             player.coins += 3;
             io.to(room.id).emit("play_animation", { type: "gain_coins", attackerName: player.name, amount: 3, targetName: player.name });
+            io.to(room.id).emit("chat_message", { sender: "Sistema", text: `💰 Propina de Colarinho Branco! ${player.name} garantiu 3 moedas de forma imbloqueável através de ${card.name}.` });
             break;
 
         case "prevent_coup":
             if (target) {
                 target.preventCoup = true;
-                io.to(room.id).emit("chat_message", { sender: "Sistema", text: `🛡️ José Bonifácio age! ${target.name} não pode vencer (dar Golpe) nesta rodada.` });
+                io.to(room.id).emit("chat_message", { sender: "Sistema", text: `🛡️ O Patriarca da Independência age! José Bonifácio impediu que ${target.name} desse um Golpe nesta rodada.` });
             }
             break;
 
@@ -123,7 +128,11 @@ export function applyCardEffect(room: Room, player: Player, card: Card, targetPl
                     io.to(player.id).emit("play_animation", { type: "swap", attackerName: player.name, attackerCard: card, targetName: target.name, targetCard });
                     io.to(target.id).emit("play_animation", { type: "swap", attackerName: player.name, attackerCard: card, targetName: target.name, targetCard: actorCard });
                     io.to(room.id).except(player.id).except(target.id).emit("play_animation", { type: "swap", attackerName: player.name, attackerCard: card, targetName: target.name });
-                    io.to(room.id).emit("chat_message", { sender: "Sistema", text: `🔄 ${player.name} trocou uma carta com ${target.name} via ${card.name}.` });
+
+                    let swapText = `🔄 Diplomacia de Corte! ${player.name} trocou uma carta com ${target.name} via ${card.name}.`;
+                    if (card.name === "Princesa Isabel") swapText = `📜 Lei Áurea da Diplomacia! Princesa Isabel libertou uma carta em troca de outra com ${target.name}.`;
+
+                    io.to(room.id).emit("chat_message", { sender: "Sistema", text: swapText });
                 }
 
                 // ── Diarchy condition ──
@@ -154,22 +163,26 @@ export function applyCardEffect(room: Room, player: Player, card: Card, targetPl
                 if (!p.hand.length) p.hand = room.deck.splice(0, 4);
             });
             room.players.forEach((p) => ensureVisibleCard(p));
+            io.to(room.id).emit("chat_message", { sender: "Sistema", text: `🖋️ O Estrangeiro de Camus! ${player.name} forçou a redistribuição de cartas, exceto para a Realeza.` });
             break;
         }
 
         case "protection_3_turns":
             player.protectionTurns = 3;
             player.protectionCard = card;
+            io.to(room.id).emit("chat_message", { sender: "Sistema", text: `🛡️ Doutrina de Isolacionismo! George Washington declarou neutralidade total para ${player.name} por 3 rodadas.` });
             break;
 
         case "protection_2_turns":
             player.protectionTurns = 2;
             player.protectionCard = card;
+            io.to(room.id).emit("chat_message", { sender: "Sistema", text: `🛡️ Imunidade Parlamentar! ${player.name} está protegido por 2 rodadas.` });
             break;
 
         case "draw_2_or_block":
         case "draw_2_or_block_unblockable":
             player.hand.push(...room.deck.splice(0, 2));
+            io.to(room.id).emit("chat_message", { sender: "Sistema", text: `📜 Pacto de Defesa! ${player.name} reforçou sua mão com 2 novas cartas.` });
             break;
 
         case "slavery":
@@ -205,6 +218,7 @@ export function applyCardEffect(room: Room, player: Player, card: Card, targetPl
             if (target) {
                 target.skipNextTurn = true;
                 io.to(room.id).emit("play_animation", { type: "skip", attackerName: player.name, attackerCard: card, targetName: target.name });
+                io.to(room.id).emit("chat_message", { sender: "Sistema", text: `⏳ Censura Prévia! ${player.name} silenciou ${target.name} por uma rodada.` });
             }
             break;
 
@@ -213,6 +227,7 @@ export function applyCardEffect(room: Room, player: Player, card: Card, targetPl
                 const removed = target.hand.splice(Math.floor(Math.random() * target.hand.length), 1)[0];
                 ensureVisibleCard(target);
                 io.to(room.id).emit("play_animation", { type: "eliminate", attackerName: player.name, attackerCard: card, targetName: target.name, targetCard: removed });
+                io.to(room.id).emit("chat_message", { sender: "Sistema", text: `💥 Atentado de Dupla Face! ${player.name} eliminou uma carta de ${target.name} e sacrificou uma própria.` });
                 if (player.hand.length > 0) {
                     const myRemoved = player.hand.splice(Math.floor(Math.random() * player.hand.length), 1)[0];
                     ensureVisibleCard(player);
@@ -226,6 +241,7 @@ export function applyCardEffect(room: Room, player: Player, card: Card, targetPl
                 const removed = target.hand.splice(Math.floor(Math.random() * target.hand.length), 1)[0];
                 ensureVisibleCard(target);
                 io.to(room.id).emit("play_animation", { type: "eliminate", attackerName: player.name, attackerCard: card, targetName: target.name, targetCard: removed });
+                io.to(room.id).emit("chat_message", { sender: "Sistema", text: `🗡️ Golpe de Estado! ${player.name} eliminou uma carta de ${target.name}.` });
             }
             break;
 
@@ -237,6 +253,7 @@ export function applyCardEffect(room: Room, player: Player, card: Card, targetPl
                 room.deck.sort(() => Math.random() - 0.5);
                 if (oldHandSize > 1) target.hand = room.deck.splice(0, oldHandSize - 1);
                 ensureVisibleCard(target);
+                io.to(room.id).emit("chat_message", { sender: "Sistema", text: `🌪️ Purga Política! ${player.name} forçou ${target.name} a perder uma carta e reembaralhar sua mão.` });
             }
             break;
 
@@ -258,6 +275,7 @@ export function applyCardEffect(room: Room, player: Player, card: Card, targetPl
                 target.coins -= amount;
                 player.coins += amount;
                 io.to(room.id).emit("play_animation", { type: "gain_coins", attackerName: player.name, amount, targetName: player.name });
+                io.to(room.id).emit("chat_message", { sender: "Sistema", text: `💸 Corrupção Ativa! ${player.name} desviou ${amount} moedas do caixa de ${target.name}.` });
             }
             break;
 
@@ -296,12 +314,14 @@ export function applyCardEffect(room: Room, player: Player, card: Card, targetPl
         case "passive_coin_and_immune":
             player.coins += 1;
             io.to(room.id).emit("play_animation", { type: "gain_coins", attackerName: player.name, amount: 1, targetName: player.name });
+            io.to(room.id).emit("chat_message", { sender: "Sistema", text: `🛡️ Status Passivo! ${player.name} ganhou 1 moeda e permanece sob proteção de Diógenes.` });
             break;
 
         case "force_swap_visible":
             if (target) {
                 target.visibleCard = null;
                 ensureVisibleCard(target);
+                io.to(room.id).emit("chat_message", { sender: "Sistema", text: `🎭 Mudança de Fachada! ${player.name} forçou ${target.name} a alterar sua carta visível.` });
             }
             break;
 
@@ -312,6 +332,7 @@ export function applyCardEffect(room: Room, player: Player, card: Card, targetPl
                 room.discardPile.push(removed);
                 ensureVisibleCard(target);
                 io.to(room.id).emit("play_animation", { type: "eliminate", attackerName: player.name, attackerCard: card, targetName: target.name, targetCard: removed });
+                io.to(room.id).emit("chat_message", { sender: "Sistema", text: `🏹 Assassinato Seletivo! ${player.name} pagou 2 moedas para eliminar uma carta de ${target.name}.` });
             }
             break;
 
@@ -322,6 +343,7 @@ export function applyCardEffect(room: Room, player: Player, card: Card, targetPl
                 room.discardPile.push(removed);
                 ensureVisibleCard(target);
                 io.to(room.id).emit("play_animation", { type: "eliminate", attackerName: player.name, attackerCard: card, targetName: target.name, targetCard: removed });
+                io.to(room.id).emit("chat_message", { sender: "Sistema", text: `🪓 Terror Revolucionário! ${player.name} pagou 3 moedas para guilhotinar uma carta de ${target.name}.` });
             }
             break;
 
@@ -383,7 +405,7 @@ export function applyCardEffect(room: Room, player: Player, card: Card, targetPl
                 break;
             }
 
-            let report = "🔍 Platão revelou:";
+            let report = "🔍 Saindo da Caverna: Platão revelou as sombras de:";
             selected.forEach(p => {
                 const card = p.hand[Math.floor(Math.random() * p.hand.length)];
                 if (card) {
@@ -391,6 +413,28 @@ export function applyCardEffect(room: Room, player: Player, card: Card, targetPl
                 }
             });
             io.to(player.id).emit("chat_message", { sender: "Sistema", text: report });
+            break;
+        }
+
+        case "eliminate_two_opponents": {
+            const opponentsWithCards = room.players.filter(p => p.id !== player.id && p.hand.length > 0);
+            if (opponentsWithCards.length === 0) {
+                io.to(player.id).emit("chat_message", { sender: "Sistema", text: "🔍 Não há oponentes com cartas para eliminar." });
+                break;
+            }
+
+            const targets = opponentsWithCards.sort(() => Math.random() - 0.5).slice(0, 2);
+            targets.forEach(t => {
+                const removed = t.hand.splice(Math.floor(Math.random() * t.hand.length), 1)[0];
+                room.discardPile.push(removed);
+                ensureVisibleCard(t);
+                io.to(room.id).emit("play_animation", { type: "eliminate", attackerName: player.name, attackerCard: card, targetName: t.name, targetCard: removed });
+            });
+
+            io.to(room.id).emit("chat_message", {
+                sender: "Sistema",
+                text: `🏴 Insurreição Bakuninista! ${player.name} desferiu um golpe coletivo, eliminando cartas de ${targets.map(t => t.name).join(" e ")}.`
+            });
             break;
         }
 
@@ -402,7 +446,7 @@ export function applyCardEffect(room: Room, player: Player, card: Card, targetPl
                 room.deck.sort(() => Math.random() - 0.5);
                 target.hand = room.deck.splice(0, count);
                 ensureVisibleCard(target);
-                io.to(room.id).emit("chat_message", { sender: "Sistema", text: `♻️ Júlio César embaralhou a mão de ${target.name} de volta ao monte e redistribuiu ${count} novas cartas!` });
+                io.to(room.id).emit("chat_message", { sender: "Sistema", text: `⚔️ A Sorte está Lançada! Júlio César cruzou o Rubicão e forçou ${target.name} a recomeçar com ${count} novas cartas!` });
             }
             break;
 
@@ -424,7 +468,11 @@ export function applyCardEffect(room: Room, player: Player, card: Card, targetPl
             const totalPool = room.players.reduce((sum, p) => sum + p.coins, 0);
             const equalAmount = Math.ceil(totalPool / room.players.length);
             room.players.forEach((p) => { p.coins = equalAmount; });
-            io.to(room.id).emit("chat_message", { sender: "Sistema", text: `🛠️ Karl Marx redistribuiu o capital! Todos agora possuem ${equalAmount} moedas.` });
+
+            let text = `🛠️ Karl Marx redistribuiu o capital! Todos agora possuem ${equalAmount} moedas.`;
+            if (card.name === "Movimento Coletivista") text = `🏴 Ação Direta Coletiva! O Movimento Coletivista redistribuiu a riqueza: todos agora têm ${equalAmount} moedas.`;
+
+            io.to(room.id).emit("chat_message", { sender: "Sistema", text });
             break;
         }
 

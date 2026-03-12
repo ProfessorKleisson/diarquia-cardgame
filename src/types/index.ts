@@ -12,7 +12,8 @@ export type CardClass =
     | "Liberais Clássicos"
     | "Especial"
     | "Golpe Religioso"
-    | "República";
+    | "República"
+    | "Anarquismo";
 
 export interface Card {
     id: string;
@@ -84,5 +85,6 @@ export interface Room {
         card: Card;
         options: { id: string; label: string }[];
     } | null;
+    expansionEnabled: boolean;
     diarchy?: { player1Id: string; player2Id: string } | null;
 }

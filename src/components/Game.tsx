@@ -85,7 +85,7 @@ export function Game({ room, socket }: { room: Room; socket: Socket }) {
             setAlerts(prev => [{ id, text: data.text }, ...prev].slice(0, 6));
             setTimeout(() => {
                 setAlerts(prev => prev.filter(a => a.id !== id));
-            }, 8000);
+            }, 20000);
         };
 
         socket.on("defense_required", onDefenseRequired);

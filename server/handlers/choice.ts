@@ -21,15 +21,28 @@ export function registerChoiceHandlers(socket: Socket) {
 
         // ── Adam Smith / John Locke ──────────────────────
         if (cardPower === "draw_5_or_card") {
+            const cardName = room.pendingChoice.card.name;
             if (choiceId === "coins") {
                 player.coins += 5;
+                let text = `💰 Capitalismo Laissez-faire! ${player.name} escolheu 5 moedas via efeito liberal de ${cardName}.`;
+                if (cardName === "Adam Smith") text = `💰 A Mão Invisível! ${player.name} obteve 5 moedas através do livre mercado de Adam Smith.`;
+                if (cardName === "John Locke") text = `💰 Direito à Propriedade! ${player.name} adquiriu 5 moedas através do Contrato Social de John Locke.`;
+
                 io.to(roomId).emit("play_animation", { type: "gain_coins", attackerName: player.name, amount: 5, targetName: player.name });
-                io.to(roomId).emit("chat_message", { sender: "Sistema", text: `💰 ${player.name} escolheu 5 moedas via efeito liberal.` });
+                io.to(roomId).emit("chat_message", { sender: "Sistema", text });
             } else if (choiceId === "card" && room.deck.length > 0) {
                 const drawnCard = room.deck.shift()!;
                 player.hand.push(drawnCard);
-                io.to(roomId).emit("play_animation", { type: "draw", attackerName: player.name, targetCard: drawnCard, targetName: player.name });
-                io.to(roomId).emit("chat_message", { sender: "Sistema", text: `🎴 ${player.name} escolheu sacar uma carta via efeito liberal.` });
+
+                let text = `🎴 Liberalismo em Ação! ${player.name} buscou um novo aliado no deck via ${cardName}.`;
+                if (cardName === "Adam Smith") text = `🎴 Divisão do Trabalho! ${player.name} otimizou sua estratégia sacando uma carta com Adam Smith.`;
+                if (cardName === "John Locke") text = `🎴 Tábula Rasa! ${player.name} buscou novos conhecimentos no deck com John Locke.`;
+
+                // Private: only the drawer sees the card face
+                io.to(socket.id).emit("play_animation", { type: "draw", attackerName: player.name, targetCard: drawnCard, targetName: player.name });
+                // Public: others see a card is drawn without revealing its face
+                io.to(roomId).except(socket.id).emit("play_animation", { type: "draw", attackerName: player.name, targetCard: null, targetName: player.name });
+                io.to(roomId).emit("chat_message", { sender: "Sistema", text });
             }
         }
 
@@ -43,8 +56,9 @@ export function registerChoiceHandlers(socket: Socket) {
                 room.discardPile.push(removed);
                 ensureVisibleCard(target);
                 io.to(roomId).emit("play_animation", { type: "eliminate", attackerName: player.name, attackerCard: room.pendingChoice.card, targetName: target.name, targetCard: removed });
-                io.to(roomId).emit("chat_message", { sender: "Sistema", text: `🗡️ ${player.name} eliminou uma carta de ${target.name} via Bruto.` });
+                io.to(roomId).emit("chat_message", { sender: "Sistema", text: `🗡️ Et tu, Brute? ${player.name} desferiu um golpe fatal eliminando uma carta de ${target.name}.` });
             } else if (choiceId === "swap") {
+                io.to(roomId).emit("chat_message", { sender: "Sistema", text: `🔄 Conspiração de Bastidores! ${player.name} decidiu trocar influências com ${target.name}.` });
                 room.pendingChoice = null;
                 room.turnPhase = "waiting_card_selection";
                 room.pendingCardSelection = { actorId: player.id, targetId: target.id, targetHand: [...player.hand], actionType: "give" };
@@ -63,11 +77,11 @@ export function registerChoiceHandlers(socket: Socket) {
                 room.discardPile.push(removed);
                 ensureVisibleCard(target);
                 io.to(roomId).emit("play_animation", { type: "eliminate", attackerName: player.name, attackerCard: room.pendingChoice.card, targetName: target.name, targetCard: removed });
-                io.to(roomId).emit("chat_message", { sender: "Sistema", text: `🗡️ ${player.name} eliminou uma carta de ${target.name} via Maquiavel.` });
+                io.to(roomId).emit("chat_message", { sender: "Sistema", text: `🗡️ Os Fins Justificam os Meios! ${player.name} eliminou uma carta de ${target.name} sob ordens de Maquiavel.` });
             } else if (choiceId === "skip") {
                 target.skipNextTurn = true;
                 io.to(roomId).emit("play_animation", { type: "skip", attackerName: player.name, attackerCard: room.pendingChoice.card, targetName: target.name });
-                io.to(roomId).emit("chat_message", { sender: "Sistema", text: `⏳ ${player.name} forçou ${target.name} a passar a vez via Maquiavel.` });
+                io.to(roomId).emit("chat_message", { sender: "Sistema", text: `⏳ Estratégia de Poder! ${player.name} paralisou o governo de ${target.name} via Maquiavel.` });
             }
         }
 

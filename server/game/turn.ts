@@ -15,34 +15,37 @@ export function checkWinCondition(room: Room) {
 
         if (p1 && p2) {
             const diarchyBlocked = p1.preventCoup || p2.preventCoup;
-            if (!diarchyBlocked) {
-                if (p1.coins + p2.coins >= 15) {
-                    room.winner = "DIARCHY";
-                    room.winReason = "diarchy_coins";
-                    room.status = "finished";
-                    return;
-                }
+            const coinsWin = p1.coins + p2.coins >= 15;
 
-                const combinedHand = [...p1.hand, ...p2.hand];
-                const jokers = combinedHand.filter((c) => c.power === "joker").length;
-                const withoutJokers = combinedHand.filter((c) => c.power !== "joker");
-                const classCounts: Record<string, number> = {};
-                for (const card of withoutJokers) {
-                    if (card.class !== "Especial") {
-                        classCounts[card.class] = (classCounts[card.class] || 0) + 1;
-                    }
+            // Check triad
+            const combinedHand = [...p1.hand, ...p2.hand];
+            const jokers = combinedHand.filter((c) => c.power === "joker").length;
+            const withoutJokers = combinedHand.filter((c) => c.power !== "joker");
+            const classCounts: Record<string, number> = {};
+            for (const card of withoutJokers) {
+                if (card.class !== "Especial") {
+                    classCounts[card.class] = (classCounts[card.class] || 0) + 1;
                 }
-                for (const cls in classCounts) {
-                    if (classCounts[cls] + jokers >= 3) {
-                        room.winner = "DIARCHY";
-                        room.winReason = "diarchy_triad";
-                        room.status = "finished";
-                        return;
-                    }
+            }
+            let triadWin = jokers >= 3;
+            let triadClass = "";
+            for (const cls in classCounts) {
+                if (classCounts[cls] + jokers >= 3) {
+                    triadWin = true;
+                    triadClass = cls;
+                    break;
                 }
-                if (jokers >= 3) {
+            }
+
+            if (coinsWin || triadWin) {
+                if (diarchyBlocked) {
+                    io.to(room.id).emit("chat_message", {
+                        sender: "Sistema",
+                        text: `🛑 GOLPE DE DIARQUIA BLOQUEADO! ${p1.name} e ${p2.name} teriam assumido o controle total ${coinsWin ? "pelo capital" : `pela Coalizão de ${triadClass}`}, mas José Bonifácio interviu!`
+                    });
+                } else {
                     room.winner = "DIARCHY";
-                    room.winReason = "diarchy_triad";
+                    room.winReason = coinsWin ? "diarchy_coins" : "diarchy_triad";
                     room.status = "finished";
                     return;
                 }
@@ -52,34 +55,46 @@ export function checkWinCondition(room: Room) {
 
     // Individual win conditions
     for (const player of room.players) {
-        if (player.preventCoup) continue;
+        let potentialWin = false;
+        let reason = "";
 
         if (player.coins >= 15) {
-            room.winner = player.id;
-            room.winReason = "coins";
-            room.status = "finished";
-            return;
+            potentialWin = true;
+            reason = "acumular monumental poder financeiro";
         }
 
-        const jokers = player.hand.filter((c) => c.power === "joker").length;
-        const withoutJokers = player.hand.filter((c) => c.power !== "joker");
-        const classCounts: Record<string, number> = {};
-        for (const card of withoutJokers) {
-            if (card.class !== "Especial") {
-                classCounts[card.class] = (classCounts[card.class] || 0) + 1;
+        if (!potentialWin) {
+            const jokers = player.hand.filter((c) => c.power === "joker").length;
+            const withoutJokers = player.hand.filter((c) => c.power !== "joker");
+            const classCounts: Record<string, number> = {};
+            for (const card of withoutJokers) {
+                if (card.class !== "Especial") {
+                    classCounts[card.class] = (classCounts[card.class] || 0) + 1;
+                }
+            }
+            for (const cls in classCounts) {
+                if (classCounts[cls] + jokers >= 3) {
+                    potentialWin = true;
+                    reason = `formar uma poderosa Coalizão de ${cls}`;
+                    break;
+                }
+            }
+            if (!potentialWin && jokers >= 3) {
+                potentialWin = true;
+                reason = "reunir figuras políticas coringas sob seu comando";
             }
         }
-        for (const cls in classCounts) {
-            if (classCounts[cls] + jokers >= 3) {
-                room.winner = player.id;
-                room.winReason = "triad";
-                room.status = "finished";
-                return;
+
+        if (potentialWin) {
+            if (player.preventCoup) {
+                io.to(room.id).emit("chat_message", {
+                    sender: "Sistema",
+                    text: `🛑 GOLPE FRUSTRADO! ${player.name} teria vencido ao ${reason}, mas foi impedido pelo Patriarca da Independência, José Bonifácio!`
+                });
+                continue;
             }
-        }
-        if (jokers >= 3) {
             room.winner = player.id;
-            room.winReason = "triad";
+            room.winReason = player.coins >= 15 ? "coins" : "triad";
             room.status = "finished";
             return;
         }

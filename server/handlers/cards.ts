@@ -23,6 +23,8 @@ export function registerCardHandlers(socket: Socket) {
         const card = player.hand[cardIndex];
         const target = targetPlayerId ? room.players.find((p) => p.id === targetPlayerId) : null;
 
+        io.to(roomId).emit("chat_message", { sender: "Sistema", text: `🃏 ${player.name} está tentando usar ${card.name}${target ? ` contra ${target.name}` : ""}...` });
+
         // Slavery restriction: slave must play benefit card if they have one
         if (player.isSlaveOf && card.type !== "benefit") {
             if (player.hand.some((c) => c.type === "benefit")) {
@@ -121,13 +123,16 @@ export function registerCardHandlers(socket: Socket) {
                         actor.hand = room.deck.splice(0, 4);
                         room.deck.sort(() => Math.random() - 0.5);
                         ensureVisibleCard(actor);
-                        io.to(room.id).emit("chat_message", { sender: "Sistema", text: `⚖️ Hannah Arendt agiu! ${actor.name} perdeu sua mão e teve que sacar novas cartas.` });
+                        io.to(room.id).emit("chat_message", { sender: "Sistema", text: `⚖️ Julgamento da Banalidade do Mal! Hannah Arendt forçou a renovação total do pensamento (e da mão) de ${actor.name}.` });
                     }
+                } else {
+                    io.to(roomId).emit("chat_message", { sender: "Sistema", text: `❌ Falha na defesa! ${defenseCard.name} não tem poder político para deter ${attackCard.name}.` });
                 }
             }
         }
 
         if (!defenseSuccessful) {
+            io.to(roomId).emit("chat_message", { sender: "Sistema", text: `🏳️ ${target.name} não contestou e o efeito de ${attackCard.name} será aplicado!` });
             applyCardEffect(room, actor, attackCard, target.id);
         }
 

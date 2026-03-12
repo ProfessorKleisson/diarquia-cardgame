@@ -31,6 +31,7 @@ export function registerRoomHandlers(socket: Socket) {
             pendingChoice: null,
             pendingRotateSelection: null,
             diarchy: null,
+            expansionEnabled: true,
         };
         rooms.set(roomId, newRoom);
         socket.join(roomId);
@@ -81,6 +82,13 @@ export function registerRoomHandlers(socket: Socket) {
         }
     });
 
+    socket.on("toggle_expansion", ({ roomId }) => {
+        const room = rooms.get(roomId);
+        if (!room || room.host !== socket.id) return;
+        room.expansionEnabled = !room.expansionEnabled;
+        io.to(roomId).emit("room_update", room);
+    });
+
     socket.on("leave_room", ({ roomId }) => {
         const room = rooms.get(roomId);
         if (!room) return;
@@ -100,7 +108,7 @@ export function registerRoomHandlers(socket: Socket) {
         room.status = "waiting";
         room.winner = null;
         room.winReason = null;
-        room.deck = generateDeck();
+        room.deck = generateDeck(room.expansionEnabled);
         room.discardPile = [];
         room.pendingAction = null;
         room.pendingCardSelection = null;
@@ -125,6 +133,7 @@ export function registerRoomHandlers(socket: Socket) {
         room.status = "playing";
         room.currentTurnIndex = 0;
         room.turnPhase = "start";
+        room.deck = generateDeck(room.expansionEnabled);
         room.players.forEach((player) => {
             player.hand = room.deck.splice(0, 4);
             ensureVisibleCard(player);
