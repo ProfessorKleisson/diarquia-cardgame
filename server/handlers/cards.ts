@@ -5,7 +5,7 @@
 
 import type { Socket } from "socket.io";
 import { io, rooms } from "../context";
-import { ensureVisibleCard } from "../game/deck";
+import { ensureVisibleCard, drawFromDeck } from "../game/deck";
 import { applyCardEffect, checkCanBlock } from "../game/effects";
 import { checkWinCondition, nextTurn } from "../game/turn";
 
@@ -23,7 +23,7 @@ export function registerCardHandlers(socket: Socket) {
         const card = player.hand[cardIndex];
         const target = targetPlayerId ? room.players.find((p) => p.id === targetPlayerId) : null;
 
-        io.to(roomId).emit("chat_message", { sender: "Sistema", text: `🃏 ${player.name} lançou ${card.name}${target ? ` contra ${target.name}` : ""}!` });
+        io.to(roomId).emit("chat_message", { sender: "Sistema", text: `🃏 ${player.name} usou ${card.name}${target ? ` contra ${target.name}` : ""}!` });
 
         // Slavery restriction: slave must play benefit card if they have one
         if (player.isSlaveOf && card.type !== "benefit") {
@@ -54,7 +54,7 @@ export function registerCardHandlers(socket: Socket) {
         if (needsDefensePhase) {
             // Protection check
             if (target!.protectionTurns && target!.protectionTurns > 0) {
-                io.to(roomId).emit("chat_message", { sender: "Sistema", text: `🛡️ IMUNIDADE! ${target!.name} está protegido — o efeito de ${card.name} falhou.` });
+                io.to(roomId).emit("chat_message", { sender: "Sistema", text: `🛡️ Imune! ${target!.name} está protegido.` });
                 player.hand.splice(cardIndex, 1);
                 room.discardPile.push(card);
                 ensureVisibleCard(player);
@@ -107,11 +107,20 @@ export function registerCardHandlers(socket: Socket) {
                     target.hand.splice(defenseCardIndex, 1);
                     room.discardPile.push(defenseCard);
 
-                    if (room.deck.length > 0) target.hand.push(room.deck.pop()!);
+                    const newCards = drawFromDeck(room, 1);
+                    if (newCards.length > 0) {
+                        const newCard = newCards[0];
+                        target.hand.push(newCard);
+                        // Emit private draw animation for target
+                        io.to(target.id).emit("play_animation", { type: "draw", attackerName: target.name, targetCard: newCard, targetName: target.name });
+                        // Emit public draw animation (hidden card) for others
+                        io.to(roomId).except(target.id).emit("play_animation", { type: "draw", attackerName: target.name, targetCard: null, targetName: target.name });
+                    }
+
                     ensureVisibleCard(target);
 
                     io.to(roomId).emit("play_animation", { type: "block_draw", attackerName: target.name, attackerCard: defenseCard, targetName: actor.name });
-                    io.to(roomId).emit("chat_message", { sender: "Sistema", text: `🛡️ ${target.name} bloqueou o ataque de ${actor.name} com ${defenseCard.name} e sacou uma nova carta!` });
+                    io.to(roomId).emit("chat_message", { sender: "Sistema", text: `🛡️ ${target.name} bloqueou com ${defenseCard.name} e renovou sua carta!` });
 
                     if (defenseCard.power?.startsWith("protection_")) {
                         applyCardEffect(room, target, defenseCard);
@@ -119,20 +128,19 @@ export function registerCardHandlers(socket: Socket) {
                     }
 
                     if (defenseCard.power === "block_coups") {
-                        room.deck.push(...actor.hand);
-                        actor.hand = room.deck.splice(0, 4);
-                        room.deck.sort(() => Math.random() - 0.5);
+                        const oldHandSize = actor.hand.length;
+                        room.discardPile.push(...actor.hand);
+                        actor.hand = drawFromDeck(room, oldHandSize);
                         ensureVisibleCard(actor);
-                        io.to(room.id).emit("chat_message", { sender: "Sistema", text: `⚖️ Julgamento da Banalidade do Mal! Hannah Arendt forçou a renovação total do pensamento (e da mão) de ${actor.name}.` });
+                        io.to(room.id).emit("chat_message", { sender: "Sistema", text: `⚖️ Julgamento! Hannah Arendt forçou ${actor.name} a renovar toda sua mão.` });
                     }
                 } else {
-                    io.to(roomId).emit("chat_message", { sender: "Sistema", text: `❌ Falha na defesa! ${defenseCard.name} não tem poder político para deter ${attackCard.name}.` });
+                    io.to(roomId).emit("chat_message", { sender: "Sistema", text: `❌ ${defenseCard.name} não bloqueia ${attackCard.name}.` });
                 }
             }
         }
 
         if (!defenseSuccessful) {
-            io.to(roomId).emit("chat_message", { sender: "Sistema", text: `🏳️ ${target.name} não contestou e o efeito de ${attackCard.name} será aplicado!` });
             applyCardEffect(room, actor, attackCard, target.id);
         }
 

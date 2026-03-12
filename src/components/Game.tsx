@@ -214,7 +214,7 @@ export function Game({ room, socket }: { room: Room; socket: Socket }) {
             setAlerts(prev => [{ id, text: data.text }, ...prev].slice(0, 6));
             setTimeout(() => {
                 setAlerts(prev => prev.filter(a => a.id !== id));
-            }, 20000);
+            }, 7000); // Feed alert duration reduced to 7s
         };
 
         const onTargetsRevealed = (data: { revealedData: { playerName: string; cardName: string }[] }) => {

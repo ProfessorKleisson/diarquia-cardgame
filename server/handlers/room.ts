@@ -8,7 +8,7 @@
 import type { Socket, Server } from "socket.io";
 import { io, rooms } from "../context";
 import { generateDeck } from "../cards/definitions";
-import { ensureVisibleCard } from "../game/deck";
+import { ensureVisibleCard, drawFromDeck } from "../game/deck";
 
 export function registerRoomHandlers(socket: Socket) {
     socket.on("create_room", ({ playerName, maxPlayers, isPublic }, callback) => {
@@ -30,6 +30,7 @@ export function registerRoomHandlers(socket: Socket) {
             pendingCardSelection: null,
             pendingChoice: null,
             pendingRotateSelection: null,
+            pendingTargetsSelection: null,
             diarchy: null,
             expansionEnabled: true,
         };
@@ -112,6 +113,7 @@ export function registerRoomHandlers(socket: Socket) {
         room.discardPile = [];
         room.pendingAction = null;
         room.pendingCardSelection = null;
+        room.pendingTargetsSelection = null;
         room.diarchy = null;
         room.players.forEach((p) => {
             p.hand = [];
@@ -135,7 +137,7 @@ export function registerRoomHandlers(socket: Socket) {
         room.turnPhase = "start";
         room.deck = generateDeck(room.expansionEnabled);
         room.players.forEach((player) => {
-            player.hand = room.deck.splice(0, 4);
+            player.hand = drawFromDeck(room, 4);
             ensureVisibleCard(player);
         });
         io.to(roomId).emit("room_update", room);

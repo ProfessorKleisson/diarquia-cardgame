@@ -5,7 +5,7 @@
 
 import type { Socket } from "socket.io";
 import { io, rooms } from "../context";
-import { ensureVisibleCard } from "../game/deck";
+import { ensureVisibleCard, drawFromDeck } from "../game/deck";
 import { checkWinCondition, nextTurn } from "../game/turn";
 
 export function registerTurnHandlers(socket: Socket) {
@@ -40,15 +40,17 @@ export function registerTurnHandlers(socket: Socket) {
         if (room.turnPhase !== "start") return;
 
         const player = room.players[room.currentTurnIndex];
-        if (room.deck.length > 0) {
-            const drawnCard = room.deck.shift()!;
+        const drawn = drawFromDeck(room, 1);
+
+        if (drawn.length > 0) {
+            const drawnCard = drawn[0];
             player.hand.push(drawnCard);
 
             // Private: only the drawer sees the card face
             io.to(socket.id).emit("play_animation", { type: "draw", attackerName: player.name, targetCard: drawnCard, targetName: player.name });
             // Public: others see a card is drawn without revealing its face
             io.to(roomId).except(socket.id).emit("play_animation", { type: "draw", attackerName: player.name, targetCard: null, targetName: player.name });
-            io.to(roomId).emit("chat_message", { sender: "Sistema", text: `🎴 ${player.name} buscou novos aliados no deck.` });
+            io.to(roomId).emit("chat_message", { sender: "Sistema", text: `🎴 ${player.name} buscou reforços.` });
         }
         ensureVisibleCard(player);
         room.turnPhase = "action";
