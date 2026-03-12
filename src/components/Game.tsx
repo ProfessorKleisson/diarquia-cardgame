@@ -744,51 +744,51 @@ export function Game({ room, socket }: { room: Room; socket: Socket }) {
                                         return acc;
                                     }, {} as Record<string, typeof me.hand>)
                             ).map(([className, cards]) => (
-                                <div key={className} className="flex flex-col items-center gap-2">
-                                    <div className="text-[10px] font-bold text-stone-500 uppercase tracking-widest mb-1">{className}</div>
-                                    <div className="flex relative h-[20rem] md:h-[24rem]" style={{ width: `calc(14rem + ${(cards.length - 1) * 3}rem)` }}>
-                                        {cards.map((card, idx) => (
-                                            <div
-                                                key={card.id}
-                                                style={{
-                                                    left: `${idx * 3}rem`,
-                                                    zIndex: 10 + idx
-                                                }}
-                                                className={cn(
-                                                    "absolute top-0 transition-all duration-300 hover:z-[100] hover:-translate-y-4 hover:translate-x-4",
-                                                    "w-56 h-[20rem] md:w-64 md:h-[24rem] rounded-xl border-2 flex flex-col cursor-pointer bg-stone-900 shadow-xl overflow-hidden group",
-                                                    isSelectingVisible && card.class === "Especial" ? "opacity-30 cursor-not-allowed" : "opacity-100",
-                                                    isSelectingVisible ? "border-amber-500/30 hover:border-amber-400" : "border-stone-700 hover:border-stone-400"
-                                                )}
-                                                onClick={() => handleCardClick(card)}
-                                            >
-                                                {card.image && (
-                                                    <div className="absolute inset-0 z-0">
-                                                        <img src={card.image} alt={card.name} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-transform duration-500 group-hover:scale-110" />
-                                                        {/* Left strip highlighting class/indicator if stacked */}
-                                                        <div className="absolute inset-y-0 left-0 w-8 bg-black/40 backdrop-blur-sm border-r border-white/10 flex items-center justify-center">
-                                                            <div className="rotate-90 whitespace-nowrap text-[8px] font-bold text-white/60 uppercase tracking-tighter">
-                                                                {card.class}
+                                <div key={className} className="flex flex-col items-center">
+                                    <div className="flex relative h-[22rem] md:h-[26rem]" style={{ width: `calc(10rem + ${(cards.length - 1) * 2.5}rem)` }}>
+                                        {cards.map((card, idx) => {
+                                            const rotation = (idx - (cards.length - 1) / 2) * 4;
+                                            return (
+                                                <div
+                                                    key={card.id}
+                                                    style={{
+                                                        left: `${idx * 2.5}rem`,
+                                                        zIndex: 10 + idx,
+                                                        transform: `rotate(${rotation}deg) translateY(${Math.abs(idx - (cards.length - 1) / 2) * 4}px)`
+                                                    }}
+                                                    className={cn(
+                                                        "absolute top-0 transition-all duration-300 hover:z-[100] hover:-translate-y-12 hover:scale-105 hover:!rotate-0",
+                                                        "w-52 h-[18rem] md:w-60 md:h-[22rem] rounded-xl border-2 flex flex-col cursor-pointer bg-stone-900 shadow-2xl overflow-hidden group",
+                                                        isSelectingVisible && card.class === "Especial" ? "opacity-30 cursor-not-allowed" : "opacity-100",
+                                                        isSelectingVisible ? "border-amber-500/30 hover:border-amber-400" : "border-stone-700 hover:border-stone-400"
+                                                    )}
+                                                    onClick={() => handleCardClick(card)}
+                                                >
+                                                    {card.image && (
+                                                        <div className="absolute inset-0 z-0">
+                                                            <img src={card.image} alt={card.name} className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-transform duration-500 group-hover:scale-110" />
+                                                            <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/80 to-transparent" />
+                                                        </div>
+                                                    )}
+                                                    <div className="relative z-10 p-4 h-full flex flex-col pointer-events-none">
+                                                        {!card.image && (
+                                                            <div className="flex-grow flex items-center justify-center opacity-40">
+                                                                {card.type === "attack" && <Swords className="w-16 h-16 text-red-400" />}
+                                                                {card.type === "defense" && <Shield className="w-16 h-16 text-blue-400" />}
+                                                                {card.type === "benefit" && <Coins className="w-16 h-16 text-amber-400" />}
+                                                                {card.type === "special" && <Crown className="w-16 h-16 text-purple-400" />}
+                                                            </div>
+                                                        )}
+                                                        <div className="mt-auto p-2">
+                                                            <div className="text-white font-bold text-xs drop-shadow-lg">{card.name}</div>
+                                                            <div className="text-[8px] text-stone-300 leading-tight mt-1 line-clamp-2 drop-shadow-md group-hover:line-clamp-none transition-all mr-1">
+                                                                {card.description}
                                                             </div>
                                                         </div>
                                                     </div>
-                                                )}
-                                                <div className="relative z-10 p-4 h-full flex flex-col pointer-events-none">
-                                                    {!card.image && (
-                                                        <div className="flex-grow flex items-center justify-center opacity-40">
-                                                            {card.type === "attack" && <Swords className="w-16 h-16 text-red-400" />}
-                                                            {card.type === "defense" && <Shield className="w-16 h-16 text-blue-400" />}
-                                                            {card.type === "benefit" && <Coins className="w-16 h-16 text-amber-400" />}
-                                                            {card.type === "special" && <Crown className="w-16 h-16 text-purple-400" />}
-                                                        </div>
-                                                    )}
-                                                    <div className="mt-auto bg-black/60 backdrop-blur-md p-2 rounded border border-white/10 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                        <div className="text-xs font-bold text-white leading-tight">{card.name}</div>
-                                                        <div className="text-[8px] text-stone-300 leading-tight mt-1 line-clamp-2">{card.description}</div>
-                                                    </div>
                                                 </div>
-                                            </div>
-                                        ))}
+                                            );
+                                        })}
                                     </div>
                                 </div>
                             ))}
