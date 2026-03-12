@@ -102,49 +102,29 @@ export function Game({ room, socket }: { room: Room; socket: Socket }) {
                         Math.abs(idx - mobileStackIndex) > 1 ? "hidden" : "flex"
                     ],
                     // Desktop stacked classes
-                    !isMobile && isStacked && "md:-ml-52 md:hover:ml-4", // The peek & reveal effect
+                    !isMobile && isStacked && (idx === 1 ? "md:ml-12" : "md:-ml-52 md:hover:ml-4"),
 
                     // Interaction/Type border colors
                     isSelectingVisible ? "border-amber-500/50 hover:border-amber-400" :
-                        (isVisibleCard ? "border-amber-500 shadow-amber-500/10" : "border-stone-700/50 hover:border-stone-400"),
+                        (isVisibleCard ? "border-amber-500 shadow-[0_0_25px_rgba(245,158,11,0.4)] md:z-40" : "border-stone-700/50 hover:border-stone-400"),
                     !isSelectingVisible && !isVisibleCard && card.class === "Especial" ? "border-purple-500/30 hover:border-purple-400" : "",
                     isMyTurn && room.turnPhase === "action" && !isVisibleCard && !isSelectingVisible ? "ring-2 ring-amber-500 ring-offset-2 ring-offset-stone-950" : "",
                     isSelectingVisible && card.class === "Especial" ? "opacity-30 md:opacity-50 cursor-not-allowed hover:transform-none" : ""
                 )}
             >
-                {/* Horizontal Indicator for Class (Top) */}
-                <div className="absolute top-0 left-0 right-0 h-10 bg-black/60 backdrop-blur-sm z-20 flex items-center px-3 border-b border-white/10 md:pl-16">
-                    <span className="text-[10px] font-black text-stone-300 uppercase tracking-widest truncate">{card.class}</span>
-                </div>
-
-                {/* Vertical Class Label on the left edge - key for stacked view visibility */}
-                {!isMobile && (
-                    <div className="absolute top-0 left-0 bottom-0 w-12 bg-stone-950/80 backdrop-blur-md z-30 border-r border-white/5 flex items-center justify-center overflow-hidden">
-                        <div className="rotate-[-90deg] whitespace-nowrap text-[11px] font-black text-amber-500/90 uppercase tracking-[0.4em] origin-center">
-                            {card.class}
-                        </div>
-                    </div>
-                )}
-
                 {card.image && (
                     <div className="absolute inset-0 z-0">
                         <img
                             src={card.image}
                             alt={card.name}
-                            className="w-full h-full object-cover opacity-70 group-hover:opacity-100 transition-all duration-500 group-hover:scale-110"
+                            className="w-full h-full object-cover opacity-100 transition-all duration-500 group-hover:scale-110"
                         />
-                        <div className="absolute inset-0 bg-gradient-to-t from-stone-950 via-transparent to-black/40" />
                     </div>
                 )}
 
-                <div className="relative z-10 p-4 pt-12 h-full flex flex-col pointer-events-none md:pl-16">
-                    <h3 className="text-white font-bold text-lg md:text-xl drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] leading-tight">{card.name}</h3>
-                    <p className="text-stone-200 text-[10px] md:text-xs mt-2 leading-relaxed line-clamp-4 bg-black/50 p-2 rounded backdrop-blur-sm border border-white/10 italic">
-                        {card.description}
-                    </p>
-
+                <div className="relative z-10 h-full w-full pointer-events-none">
                     {!card.image && (
-                        <div className="flex-grow flex items-center justify-center opacity-40">
+                        <div className="flex-grow h-full flex items-center justify-center opacity-40">
                             {card.type === "attack" && <Swords className={cn("w-20 h-20", isVisibleCard ? "text-amber-400" : "text-red-400")} />}
                             {card.type === "defense" && <Shield className={cn("w-20 h-20", isVisibleCard ? "text-amber-400" : "text-blue-400")} />}
                             {card.type === "benefit" && <Coins className={cn("w-20 h-20", isVisibleCard ? "text-amber-400" : "text-amber-400")} />}
@@ -153,9 +133,10 @@ export function Game({ room, socket }: { room: Room; socket: Socket }) {
                     )}
                 </div>
 
+                {/* 'Visível' tag as requested */}
                 {isVisibleCard && (
-                    <div className="absolute -bottom-1 -right-1 bg-amber-500 text-stone-900 text-[9px] font-black px-2 py-0.5 rounded-tl-lg uppercase tracking-tighter z-40">
-                        Visible
+                    <div className="absolute top-3 right-3 bg-stone-950/80 backdrop-blur-md border border-amber-500/50 text-amber-500 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest z-40 shadow-lg">
+                        Visível
                     </div>
                 )}
             </motion.div>
@@ -773,38 +754,31 @@ export function Game({ room, socket }: { room: Room; socket: Socket }) {
                             onTouchMove={handleTouchMove}
                             onTouchEnd={handleTouchEnd}
                         >
-                            {/* Desktop: Grouped and Stacked View */}
-                            <div className="hidden md:flex items-start gap-16 justify-center w-full overflow-x-auto pb-8 pt-10 scrollbar-hide">
-                                {/* Visible Card at the Left */}
-                                {groupedHand.visibleCard && (
-                                    <div className="flex flex-col items-center gap-3 flex-shrink-0">
-                                        <span className="text-[10px] text-amber-500 font-black uppercase tracking-[0.2em] bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/20">Visível</span>
-                                        <CardItem
-                                            card={groupedHand.visibleCard}
-                                            isVisibleCard={true}
-                                            idx={-1}
-                                        />
-                                    </div>
-                                )}
-
-                                {/* Card Groups by Class */}
-                                <div className="flex gap-16">
-                                    {groupedHand.groups.map(([cls, groupCards]) => (
-                                        <div key={cls} className="flex flex-col items-center gap-3">
-                                            {/* Stacked cards in group */}
-                                            <div className="flex">
-                                                {groupCards.map((card, idx) => (
-                                                    <CardItem
-                                                        key={card.id}
-                                                        card={card}
-                                                        isVisibleCard={false}
-                                                        idx={idx}
-                                                        isStacked={idx > 0}
-                                                    />
-                                                ))}
-                                            </div>
-                                        </div>
-                                    ))}
+                            {/* Desktop: Unified Unified Stacked View */}
+                            <div className="hidden md:flex items-start justify-center w-full overflow-x-auto pb-12 pt-10 scrollbar-hide">
+                                <div className="flex">
+                                    {[...me.hand]
+                                        .sort((a, b) => {
+                                            if (me.visibleCard?.id === a.id) return -1;
+                                            if (me.visibleCard?.id === b.id) return 1;
+                                            return a.class.localeCompare(b.class);
+                                        })
+                                        .map((card, idx) => {
+                                            const isVisible = me.visibleCard?.id === card.id;
+                                            return (
+                                                <CardItem
+                                                    key={card.id + idx}
+                                                    card={card}
+                                                    isVisibleCard={isVisible}
+                                                    idx={idx}
+                                                    // Only stack if it's not the first card and not the visible card 
+                                                    // but wait, the visible IS the first card.
+                                                    // Let's add an 'isFirstOfStack' prop to handle the gap.
+                                                    isStacked={idx > 0}
+                                                />
+                                            );
+                                        })
+                                    }
                                 </div>
                             </div>
 
