@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { motion } from "motion/react";
 import { Socket } from "socket.io-client";
 import { Crown, Coins, Shield, Swords, Home, RotateCcw, Eye, Plus } from "lucide-react";
@@ -20,65 +20,6 @@ import { RevealedCardsModal } from "./modals/RevealedCardsModal";
 import { DiscardCardInspectionModal } from "./modals/DiscardCardInspectionModal";
 import { OpponentViewModal } from "./modals/OpponentViewModal";
 
-
-function CardItem({
-    card,
-    isVisible = false,
-    isSelectingVisible = false,
-    onClick,
-    className: extraClassName
-}: {
-    card: Card;
-    isVisible?: boolean;
-    isSelectingVisible?: boolean;
-    onClick?: () => void;
-    className?: string;
-}) {
-    return (
-        <div
-            onClick={onClick}
-            className={cn(
-                "w-56 h-[20rem] md:w-64 md:h-[24rem] rounded-xl border-2 flex flex-col transition-all duration-300 cursor-pointer relative group select-none shadow-black/50 shadow-lg bg-stone-900 overflow-hidden",
-                isSelectingVisible ? "border-amber-500/50 hover:border-amber-400" : (isVisible ? "border-amber-500 shadow-amber-500/10" : "border-stone-700 hover:border-stone-400"),
-                isVisible && "ring-4 ring-amber-500/20",
-                extraClassName
-            )}
-        >
-            {card.image && (
-                <div className="absolute inset-0 z-0">
-                    <img
-                        src={card.image}
-                        alt={card.name}
-                        className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-all duration-500 group-hover:scale-110"
-                    />
-                </div>
-            )}
-
-            <div className="relative z-10 p-4 h-full flex flex-col pointer-events-none">
-                {isVisible && (
-                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-amber-500 text-stone-900 text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wider whitespace-nowrap shadow-lg">
-                        Visible to All
-                    </div>
-                )}
-
-                {!card.image && (
-                    <div className="flex-grow flex items-center justify-center opacity-40">
-                        {card.type === "attack" && <Swords className="w-20 h-20 text-red-400" />}
-                        {card.type === "defense" && <Shield className="w-20 h-20 text-blue-400" />}
-                        {card.type === "benefit" && <Coins className="w-20 h-20 text-amber-400" />}
-                        {card.type === "special" && <Crown className="w-20 h-20 text-purple-400" />}
-                    </div>
-                )}
-
-                <div className="mt-auto bg-black/60 backdrop-blur-md p-3 rounded border border-white/10 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <div className="text-sm font-bold text-white leading-tight mb-1">{card.name}</div>
-                    <div className="text-[10px] text-stone-300 leading-snug line-clamp-3">{card.description}</div>
-                </div>
-            </div>
-        </div>
-    );
-}
-
 export function Game({ room, socket }: { room: Room; socket: Socket }) {
     const [defensePrompt, setDefensePrompt] = useState<{ attackerName: string; cardName: string } | null>(null);
     const [targetingAction, setTargetingAction] = useState<{ cardId: string; isAttack: boolean } | null>(null);
@@ -98,6 +39,129 @@ export function Game({ room, socket }: { room: Room; socket: Socket }) {
     const [discardModalOpen, setDiscardModalOpen] = useState(false);
     const [touchStart, setTouchStart] = useState<number | null>(null);
     const [opponentViewModal, setOpponentViewModal] = useState<string | null>(null); // playerId
+
+    // --- Inner Component for Individual Card Rendering ---
+    const CardItem = (props: {
+        card: Card;
+        isVisibleCard: boolean;
+        idx: number;
+        isStacked?: boolean;
+        isMobile?: boolean;
+        key?: string | number;
+    }) => {
+        const { card, isVisibleCard, idx, isStacked = false, isMobile = false } = props;
+        const needsTarget = card.type === "attack" ||
+            ["prevent_coup", "peek_and_swap", "swap_card", "force_swap_visible", "marriage_diarchy", "diplomacy_diarchy"].includes(card.power || "");
+
+        const handleClick = () => {
+            if (!me) return; // Ensure 'me' is defined
+
+            if (card.class === "Especial") {
+                if (isSelectingVisible || !me?.visibleCard) {
+                    alert("Cartas Especiais não podem ser escolhidas como Carta Visível.");
+                    return;
+                }
+            }
+
+            if (isSelectingVisible || !me?.visibleCard) {
+                socket.emit("set_visible_card", { roomId: room.id, cardId: card.id });
+                setIsSelectingVisible(false);
+                return;
+            }
+
+            if (isMobile && idx !== mobileStackIndex) {
+                setMobileStackIndex(idx);
+                return;
+            }
+
+            if (isMyTurn && room.turnPhase === "action" && !isVisibleCard) {
+                if (needsTarget) {
+                    if (room.players.length <= 1) {
+                        alert("Você precisa de pelo menos um oponente para usar esta carta!");
+                        return;
+                    }
+                    setTargetingAction({ cardId: card.id, isAttack: true });
+                } else {
+                    socket.emit("play_card", { roomId: room.id, cardId: card.id });
+                }
+            }
+        };
+
+        return (
+            <motion.div
+                layout
+                onClick={handleClick}
+                whileHover={!isMobile ? { scale: 1.05, y: -20, zIndex: 50, transition: { duration: 0.2 } } : {}}
+                className={cn(
+                    "w-56 h-[20rem] md:w-64 md:h-[24rem] rounded-xl border-2 flex flex-col transition-all duration-300 cursor-pointer flex-shrink-0 relative group select-none shadow-black/50 shadow-lg bg-stone-900 overflow-hidden",
+                    // Mobile-specific classes
+                    isMobile && [
+                        "absolute left-1/2 -ml-28",
+                        idx === mobileStackIndex ? "z-30 scale-100 translate-x-0 opacity-100" :
+                            idx < mobileStackIndex ? "z-20 scale-90 -translate-x-12 opacity-60" : "z-20 scale-90 translate-x-12 opacity-60",
+                        Math.abs(idx - mobileStackIndex) > 1 ? "hidden" : "flex"
+                    ],
+                    // Desktop stacked classes
+                    !isMobile && isStacked && "md:-ml-52 md:hover:ml-4", // The peek & reveal effect
+
+                    // Interaction/Type border colors
+                    isSelectingVisible ? "border-amber-500/50 hover:border-amber-400" :
+                        (isVisibleCard ? "border-amber-500 shadow-amber-500/10" : "border-stone-700/50 hover:border-stone-400"),
+                    !isSelectingVisible && !isVisibleCard && card.class === "Especial" ? "border-purple-500/30 hover:border-purple-400" : "",
+                    isMyTurn && room.turnPhase === "action" && !isVisibleCard && !isSelectingVisible ? "ring-2 ring-amber-500 ring-offset-2 ring-offset-stone-950" : "",
+                    isSelectingVisible && card.class === "Especial" ? "opacity-30 md:opacity-50 cursor-not-allowed hover:transform-none" : ""
+                )}
+            >
+                {/* Horizontal Indicator for Class (Top) */}
+                <div className="absolute top-0 left-0 right-0 h-10 bg-black/60 backdrop-blur-sm z-20 flex items-center px-3 border-b border-white/10 md:pl-16">
+                    <span className="text-[10px] font-black text-stone-300 uppercase tracking-widest truncate">{card.class}</span>
+                </div>
+
+                {/* Vertical Class Label on the left edge - key for stacked view visibility */}
+                {!isMobile && (
+                    <div className="absolute top-0 left-0 bottom-0 w-12 bg-stone-950/80 backdrop-blur-md z-30 border-r border-white/5 flex items-center justify-center overflow-hidden">
+                        <div className="rotate-[-90deg] whitespace-nowrap text-[11px] font-black text-amber-500/90 uppercase tracking-[0.4em] origin-center">
+                            {card.class}
+                        </div>
+                    </div>
+                )}
+
+                {card.image && (
+                    <div className="absolute inset-0 z-0">
+                        <img
+                            src={card.image}
+                            alt={card.name}
+                            className="w-full h-full object-cover opacity-70 group-hover:opacity-100 transition-all duration-500 group-hover:scale-110"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-stone-950 via-transparent to-black/40" />
+                    </div>
+                )}
+
+                <div className="relative z-10 p-4 pt-12 h-full flex flex-col pointer-events-none md:pl-16">
+                    <h3 className="text-white font-bold text-lg md:text-xl drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] leading-tight">{card.name}</h3>
+                    <p className="text-stone-200 text-[10px] md:text-xs mt-2 leading-relaxed line-clamp-4 bg-black/50 p-2 rounded backdrop-blur-sm border border-white/10 italic">
+                        {card.description}
+                    </p>
+
+                    {!card.image && (
+                        <div className="flex-grow flex items-center justify-center opacity-40">
+                            {card.type === "attack" && <Swords className={cn("w-20 h-20", isVisibleCard ? "text-amber-400" : "text-red-400")} />}
+                            {card.type === "defense" && <Shield className={cn("w-20 h-20", isVisibleCard ? "text-amber-400" : "text-blue-400")} />}
+                            {card.type === "benefit" && <Coins className={cn("w-20 h-20", isVisibleCard ? "text-amber-400" : "text-amber-400")} />}
+                            {card.type === "special" && <Crown className={cn("w-20 h-20", isVisibleCard ? "text-amber-400" : "text-purple-400")} />}
+                        </div>
+                    )}
+                </div>
+
+                {isVisibleCard && (
+                    <div className="absolute -bottom-1 -right-1 bg-amber-500 text-stone-900 text-[9px] font-black px-2 py-0.5 rounded-tl-lg uppercase tracking-tighter z-40">
+                        Visible
+                    </div>
+                )}
+            </motion.div>
+        );
+    };
+
 
     const handleTouchStart = (e: React.TouchEvent) => {
         setTouchStart(e.targetTouches[0].clientX);
@@ -138,6 +202,27 @@ export function Game({ room, socket }: { room: Room; socket: Socket }) {
         room.players.some((p) => p.id !== me?.id && p.hand.some((c) => c.name === "Dom Pedro II" || c.name === "Rainha Elizabeth II"))
     );
 
+    const groupedHand = useMemo(() => {
+        if (!me) return { visibleCard: null, groups: [] };
+
+        const hand = [...me.hand];
+        const visibleCard = me.visibleCard;
+
+        const handWithoutVisible = visibleCard
+            ? hand.filter((c) => c.id !== visibleCard.id)
+            : hand;
+
+        const groupsMap: Record<string, Card[]> = {};
+        handWithoutVisible.forEach((card) => {
+            if (!groupsMap[card.class]) groupsMap[card.class] = [];
+            groupsMap[card.class].push(card);
+        });
+
+        const groups = Object.entries(groupsMap).sort((a, b) => a[0].localeCompare(b[0]));
+
+        return { visibleCard, groups };
+    }, [me?.id, me?.hand, me?.visibleCard]);
+
     useEffect(() => {
         const onDefenseRequired = (data: { attackerName: string; cardName: string }) => {
             setDefensePrompt(data);
@@ -164,39 +249,7 @@ export function Game({ room, socket }: { room: Room; socket: Socket }) {
             socket.off("chat_message", onChatMessage);
             socket.off("targets_revealed", onTargetsRevealed);
         };
-    }, [socket, room.id]);
-
-    const handleCardClick = (card: Card) => {
-        const isVisibleCard = !isSelectingVisible && me?.visibleCard?.id === card.id;
-        const needsTarget =
-            card.type === "attack" ||
-            ["prevent_coup", "peek_and_swap", "swap_card", "force_swap_visible", "marriage_diarchy", "diplomacy_diarchy"].includes(card.power || "");
-
-        if (card.class === "Especial") {
-            if (isSelectingVisible || !me?.visibleCard) {
-                alert("Cartas Especiais não podem ser escolhidas como Carta Visível.");
-                return;
-            }
-        }
-
-        if (isSelectingVisible || !me?.visibleCard) {
-            socket.emit("set_visible_card", { roomId: room.id, cardId: card.id });
-            setIsSelectingVisible(false);
-            return;
-        }
-
-        if (isMyTurn && room.turnPhase === "action" && !isVisibleCard) {
-            if (needsTarget) {
-                if (room.players.length <= 1) {
-                    alert("Você precisa de pelo menos um oponente para usar esta carta!");
-                    return;
-                }
-                setTargetingAction({ cardId: card.id, isAttack: true });
-            } else {
-                socket.emit("play_card", { roomId: room.id, cardId: card.id });
-            }
-        }
-    };
+    }, [socket]);
 
     if (!me) return null;
 
@@ -715,83 +768,69 @@ export function Game({ room, socket }: { room: Room; socket: Socket }) {
                         </div>
 
                         <div
-                            className="flex flex-wrap md:flex-nowrap gap-4 md:gap-8 pb-16 pt-0 md:pt-20 px-4 w-full max-w-[100vw] md:max-w-full min-h-[12rem] md:min-h-0 relative items-start justify-center md:justify-center mt-0 md:mt-1 scroll-smooth"
+                            className="flex flex-row md:overflow-x-visible overflow-visible pb-16 pt-0 md:pt-12 px-4 scrollbar-hide w-full max-w-[100vw] md:max-w-full min-h-[22rem] md:min-h-0 relative items-start justify-center md:justify-center mt-0 md:mt-1 scroll-smooth gap-4 md:gap-12"
+                            onTouchStart={handleTouchStart}
+                            onTouchMove={handleTouchMove}
+                            onTouchEnd={handleTouchEnd}
                         >
-                            {/* Visible Card Section (Always Left) */}
-                            {me.visibleCard && !isSelectingVisible && (
-                                <div className="flex flex-col items-center gap-2 mb-4 md:mb-0">
-                                    <div className="text-[10px] font-bold text-amber-500 uppercase tracking-widest mb-1">Visível</div>
-                                    <CardItem
-                                        card={me.visibleCard}
-                                        isVisible={true}
-                                        onClick={() => {
-                                            if (isMyTurn && room.turnPhase === "action") {
-                                                // Visible cards usually can't be played as actions in this game's logic, 
-                                                // but we keep the handler if needed.
-                                            }
-                                        }}
-                                    />
-                                </div>
-                            )}
-
-                            {/* Grouped Hand Sections */}
-                            {Object.entries(
-                                [...me.hand]
-                                    .filter(c => isSelectingVisible || c.id !== me.visibleCard?.id)
-                                    .reduce((acc, card) => {
-                                        if (!acc[card.class]) acc[card.class] = [];
-                                        acc[card.class].push(card);
-                                        return acc;
-                                    }, {} as Record<string, typeof me.hand>)
-                            ).map(([className, cards]) => (
-                                <div key={className} className="flex flex-col items-center">
-                                    <div className="flex relative h-[22rem] md:h-[26rem]" style={{ width: `calc(10rem + ${(cards.length - 1) * 2.5}rem)` }}>
-                                        {cards.map((card, idx) => {
-                                            const rotation = (idx - (cards.length - 1) / 2) * 4;
-                                            return (
-                                                <div
-                                                    key={card.id}
-                                                    style={{
-                                                        left: `${idx * 2.5}rem`,
-                                                        zIndex: 10 + idx,
-                                                        transform: `rotate(${rotation}deg) translateY(${Math.abs(idx - (cards.length - 1) / 2) * 4}px)`
-                                                    }}
-                                                    className={cn(
-                                                        "absolute top-0 transition-all duration-300 hover:z-[100] hover:-translate-y-12 hover:scale-105 hover:!rotate-0",
-                                                        "w-52 h-[18rem] md:w-60 md:h-[22rem] rounded-xl border-2 flex flex-col cursor-pointer bg-stone-900 shadow-2xl overflow-hidden group",
-                                                        isSelectingVisible && card.class === "Especial" ? "opacity-30 cursor-not-allowed" : "opacity-100",
-                                                        isSelectingVisible ? "border-amber-500/30 hover:border-amber-400" : "border-stone-700 hover:border-stone-400"
-                                                    )}
-                                                    onClick={() => handleCardClick(card)}
-                                                >
-                                                    {card.image && (
-                                                        <div className="absolute inset-0 z-0">
-                                                            <img src={card.image} alt={card.name} className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-transform duration-500 group-hover:scale-110" />
-                                                            <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/80 to-transparent" />
-                                                        </div>
-                                                    )}
-                                                    <div className="relative z-10 p-4 h-full flex flex-col pointer-events-none">
-                                                        {!card.image && (
-                                                            <div className="flex-grow flex items-center justify-center opacity-40">
-                                                                {card.type === "attack" && <Swords className="w-16 h-16 text-red-400" />}
-                                                                {card.type === "defense" && <Shield className="w-16 h-16 text-blue-400" />}
-                                                                {card.type === "benefit" && <Coins className="w-16 h-16 text-amber-400" />}
-                                                                {card.type === "special" && <Crown className="w-16 h-16 text-purple-400" />}
-                                                            </div>
-                                                        )}
-                                                        <div className="mt-auto p-2">
-                                                            <div className="text-white font-bold text-xs drop-shadow-lg">{card.name}</div>
-                                                            <div className="text-[8px] text-stone-300 leading-tight mt-1 line-clamp-2 drop-shadow-md group-hover:line-clamp-none transition-all mr-1">
-                                                                {card.description}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
+                            {/* Desktop: Grouped and Stacked View */}
+                            <div className="hidden md:flex items-start gap-16 justify-center w-full overflow-x-auto pb-8 pt-10 scrollbar-hide">
+                                {/* Visible Card at the Left */}
+                                {groupedHand.visibleCard && (
+                                    <div className="flex flex-col items-center gap-3 flex-shrink-0">
+                                        <span className="text-[10px] text-amber-500 font-black uppercase tracking-[0.2em] bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/20">Visível</span>
+                                        <CardItem
+                                            card={groupedHand.visibleCard}
+                                            isVisibleCard={true}
+                                            idx={-1}
+                                        />
                                     </div>
+                                )}
+
+                                {/* Card Groups by Class */}
+                                <div className="flex gap-16">
+                                    {groupedHand.groups.map(([cls, groupCards]) => (
+                                        <div key={cls} className="flex flex-col items-center gap-3">
+                                            {/* Stacked cards in group */}
+                                            <div className="flex">
+                                                {groupCards.map((card, idx) => (
+                                                    <CardItem
+                                                        key={card.id}
+                                                        card={card}
+                                                        isVisibleCard={false}
+                                                        idx={idx}
+                                                        isStacked={idx > 0}
+                                                    />
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ))}
                                 </div>
-                            ))}
+                            </div>
+
+                            {/* Mobile: Swiper View (Current logic) */}
+                            <div className="md:hidden flex items-start justify-center w-full relative min-h-[20rem]">
+                                {[...me.hand]
+                                    .sort((a, b) => {
+                                        if (me.visibleCard?.id === a.id) return -1;
+                                        if (me.visibleCard?.id === b.id) return 1;
+                                        return 0;
+                                    })
+                                    .map((card, idx) => (
+                                        <div
+                                            key={card.id + idx}
+                                            className="mobile-card-wrapper"
+                                        >
+                                            <CardItem
+                                                card={card}
+                                                isVisibleCard={!isSelectingVisible && me.visibleCard?.id === card.id}
+                                                idx={idx}
+                                                isMobile
+                                            />
+                                        </div>
+                                    ))
+                                }
+                            </div>
                         </div>
                     </div>
                 </div>
