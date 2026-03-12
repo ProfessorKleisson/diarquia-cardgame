@@ -15,6 +15,7 @@ import { registerTurnHandlers } from "./handlers/turn";
 import { registerCardHandlers } from "./handlers/cards";
 import { registerRotateHandlers } from "./handlers/rotate";
 import { registerChoiceHandlers } from "./handlers/choice";
+import { registerTargetsHandlers } from "./handlers/targets";
 
 const PORT = 3000;
 
@@ -38,6 +39,7 @@ export async function startServer() {
         registerCardHandlers(socket);
         registerRotateHandlers(socket);
         registerChoiceHandlers(socket);
+        registerTargetsHandlers(socket);
     });
 
     // Vite dev middleware or static dist in production

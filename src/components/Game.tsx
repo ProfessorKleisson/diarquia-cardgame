@@ -15,12 +15,16 @@ import { DefenseModal } from "./modals/DefenseModal";
 import { CardSelectionModal } from "./modals/CardSelectionModal";
 import { ChoiceModal } from "./modals/ChoiceModal";
 import { RotateSelectionModal } from "./modals/RotateSelectionModal";
+import { MultiTargetingOverlay } from "./modals/MultiTargetingOverlay";
+import { RevealedCardsModal } from "./modals/RevealedCardsModal";
 import { DiscardCardInspectionModal } from "./modals/DiscardCardInspectionModal";
 import { OpponentViewModal } from "./modals/OpponentViewModal";
 
 export function Game({ room, socket }: { room: Room; socket: Socket }) {
     const [defensePrompt, setDefensePrompt] = useState<{ attackerName: string; cardName: string } | null>(null);
     const [targetingAction, setTargetingAction] = useState<{ cardId: string; isAttack: boolean } | null>(null);
+    const [multiTargetsSelection, setMultiTargetsSelection] = useState<string[]>([]);
+    const [revealedCards, setRevealedCards] = useState<{ playerName: string; cardName: string }[] | null>(null);
 
     // Visible card selection state
     const [isSelectingVisible, setIsSelectingVisible] = useState(false);
@@ -88,12 +92,18 @@ export function Game({ room, socket }: { room: Room; socket: Socket }) {
             }, 20000);
         };
 
+        const onTargetsRevealed = (data: { revealedData: { playerName: string; cardName: string }[] }) => {
+            setRevealedCards(data.revealedData);
+        };
+
         socket.on("defense_required", onDefenseRequired);
         socket.on("chat_message", onChatMessage);
+        socket.on("targets_revealed", onTargetsRevealed);
 
         return () => {
             socket.off("defense_required", onDefenseRequired);
             socket.off("chat_message", onChatMessage);
+            socket.off("targets_revealed", onTargetsRevealed);
         };
     }, [socket]);
 
@@ -236,12 +246,21 @@ export function Game({ room, socket }: { room: Room; socket: Socket }) {
                     <div key={player.id} className={cn(
                         "flex flex-col items-center bg-stone-900 p-1.5 md:p-4 rounded-xl border flex-shrink-0 w-[90px] md:min-w-[160px] md:w-auto transition-all relative",
                         player.id === currentTurnPlayer.id ? "border-amber-500 shadow-lg shadow-amber-500/20" : "border-stone-800",
-                        targetingAction ? "ring-2 ring-red-500/50 cursor-pointer hover:scale-105" : ""
+                        targetingAction ? "ring-2 ring-red-500/50 cursor-pointer hover:scale-105" : "",
+                        (room.turnPhase === "waiting_targets_selection" && room.pendingTargetsSelection?.actorId === socket.id) ? (
+                            multiTargetsSelection.includes(player.id) ? "ring-4 ring-amber-500 shadow-xl scale-105 z-30" : "ring-2 ring-stone-700 cursor-pointer hover:border-amber-500/50"
+                        ) : ""
                     )}
                         onClick={() => {
                             if (targetingAction) {
                                 socket.emit("play_card", { roomId: room.id, cardId: targetingAction.cardId, targetPlayerId: player.id });
                                 setTargetingAction(null);
+                            } else if (room.turnPhase === "waiting_targets_selection" && room.pendingTargetsSelection?.actorId === socket.id) {
+                                setMultiTargetsSelection(prev => {
+                                    if (prev.includes(player.id)) return prev.filter(id => id !== player.id);
+                                    if (prev.length >= (room.pendingTargetsSelection?.count || 0)) return prev;
+                                    return [...prev, player.id];
+                                });
                             } else {
                                 const isPartner = room.diarchy && (
                                     (room.diarchy.player1Id === me?.id && room.diarchy.player2Id === player.id) ||
@@ -787,6 +806,28 @@ export function Game({ room, socket }: { room: Room; socket: Socket }) {
             )}
 
             <ActivityFeed alerts={alerts} />
+
+            {room.turnPhase === "waiting_targets_selection" && room.pendingTargetsSelection?.actorId === socket.id && (
+                <MultiTargetingOverlay
+                    requiredCount={room.pendingTargetsSelection.count}
+                    selectedCount={multiTargetsSelection.length}
+                    onCancel={() => {
+                        setMultiTargetsSelection([]);
+                        socket.emit("respond_defense", { roomId: room.id, action: "accept" }); // Or a proper cancel? The server doesn't have a cancel for this yet, so it ends turn as accept
+                    }}
+                    onConfirm={() => {
+                        socket.emit("submit_targets_selection", { roomId: room.id, targetIds: multiTargetsSelection });
+                        setMultiTargetsSelection([]);
+                    }}
+                />
+            )}
+
+            {revealedCards && (
+                <RevealedCardsModal
+                    revealedData={revealedCards}
+                    onClose={() => setRevealedCards(null)}
+                />
+            )}
 
         </div>
     );

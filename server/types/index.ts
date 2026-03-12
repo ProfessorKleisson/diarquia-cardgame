@@ -60,7 +60,8 @@ export interface Room {
     | "waiting_defense"
     | "waiting_card_selection"
     | "waiting_choice"
-    | "waiting_rotate_selection";
+    | "waiting_rotate_selection"
+    | "waiting_targets_selection";
     pendingAction: {
         actorId: string;
         targetId?: string;
@@ -83,6 +84,12 @@ export interface Room {
     pendingRotateSelection: {
         selections: Record<string, string>; // playerId -> cardId
         totalPlayers: number;
+        card: Card;
+    } | null;
+    pendingTargetsSelection: {
+        actorId: string;
+        count: number;
+        targets: string[];
         card: Card;
     } | null;
     isPublic: boolean;

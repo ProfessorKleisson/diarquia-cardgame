@@ -398,22 +398,20 @@ export function applyCardEffect(room: Room, player: Player, card: Card, targetPl
 
         case "peek_two_opponents": {
             const opponents = room.players.filter(p => p.id !== player.id);
-            const selected = opponents.sort(() => Math.random() - 0.5).slice(0, 2);
-
-            if (selected.length === 0) {
+            if (opponents.length === 0) {
                 io.to(player.id).emit("chat_message", { sender: "Sistema", text: "🔍 Não há oponentes para revelar cartas." });
                 break;
             }
 
-            let report = "🔍 Saindo da Caverna: Platão revelou as sombras de:";
-            selected.forEach(p => {
-                const card = p.hand[Math.floor(Math.random() * p.hand.length)];
-                if (card) {
-                    report += `\n- ${p.name}: ${card.name}`;
-                }
-            });
-            io.to(player.id).emit("chat_message", { sender: "Sistema", text: report });
-            break;
+            room.turnPhase = "waiting_targets_selection";
+            room.pendingTargetsSelection = {
+                actorId: player.id,
+                count: Math.min(2, opponents.length),
+                targets: [],
+                card,
+            };
+            io.to(player.id).emit("chat_message", { sender: "Sistema", text: `🧘 Saindo da Caverna: ${player.name} está buscando a verdade! Selecione ${room.pendingTargetsSelection.count} oponentes para revelar suas sombras.` });
+            return;
         }
 
         case "eliminate_two_opponents": {
