@@ -26,12 +26,10 @@ export function checkCanBlock(defenseCard: Card, attackCard: Card): boolean {
     // 1. IMMUNITY CARDS — block ANY attack, even unblockable
     if (defenseCard.power?.startsWith("protection_")) return true;
     if (defenseCard.power === "draw_2_or_block" || defenseCard.power === "draw_2_or_block_unblockable") return true;
+    if (defenseCard.power === "block_unblockable") return true; // Moves here to block even unblockable attacks
 
     // 2. STANDARD DEFENSES — fail against unblockable attacks
     if (isAtkUnblockable) return false;
-
-    // José Martí / Nietzsche - block anything if not unblockable (or even if unblockable if specifically coded)
-    if (defenseCard.power === "block_unblockable") return true;
 
     // Protágoras: blocks René Descartes specifically
     if (defenseCard.power === "swap_card" && attackCard.power === "peek_and_swap") return true;
