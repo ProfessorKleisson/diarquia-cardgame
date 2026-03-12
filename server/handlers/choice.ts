@@ -25,8 +25,8 @@ export function registerChoiceHandlers(socket: Socket) {
             if (choiceId === "coins") {
                 player.coins += 5;
                 let text = `💰 Capitalismo Laissez-faire! ${player.name} escolheu 5 moedas via efeito liberal de ${cardName}.`;
-                if (cardName === "Adam Smith") text = `💰 A Mão Invisível! ${player.name} obteve 5 moedas através do livre mercado de Adam Smith.`;
-                if (cardName === "John Locke") text = `💰 Direito à Propriedade! ${player.name} adquiriu 5 moedas através do Contrato Social de John Locke.`;
+                if (cardName === "Adam Smith") text = `💰 Mão Invisível! ${player.name} obteve 5 moedas via Adam Smith.`;
+                if (cardName === "John Locke") text = `💰 Propriedade Privada! ${player.name} obteve 5 moedas via John Locke.`;
 
                 io.to(roomId).emit("play_animation", { type: "gain_coins", attackerName: player.name, amount: 5, targetName: player.name });
                 io.to(roomId).emit("chat_message", { sender: "Sistema", text });
@@ -35,8 +35,8 @@ export function registerChoiceHandlers(socket: Socket) {
                 player.hand.push(drawnCard);
 
                 let text = `🎴 Liberalismo em Ação! ${player.name} buscou um novo aliado no deck via ${cardName}.`;
-                if (cardName === "Adam Smith") text = `🎴 Divisão do Trabalho! ${player.name} otimizou sua estratégia sacando uma carta com Adam Smith.`;
-                if (cardName === "John Locke") text = `🎴 Tábula Rasa! ${player.name} buscou novos conhecimentos no deck com John Locke.`;
+                if (cardName === "Adam Smith") text = `🎴 Divisão do Trabalho! ${player.name} sacou uma carta com Adam Smith.`;
+                if (cardName === "John Locke") text = `🎴 Tábula Rasa! ${player.name} sacou uma carta com John Locke.`;
 
                 // Private: only the drawer sees the card face
                 io.to(socket.id).emit("play_animation", { type: "draw", attackerName: player.name, targetCard: drawnCard, targetName: player.name });

@@ -23,7 +23,7 @@ export function registerCardHandlers(socket: Socket) {
         const card = player.hand[cardIndex];
         const target = targetPlayerId ? room.players.find((p) => p.id === targetPlayerId) : null;
 
-        io.to(roomId).emit("chat_message", { sender: "Sistema", text: `🃏 ${player.name} está tentando usar ${card.name}${target ? ` contra ${target.name}` : ""}...` });
+        io.to(roomId).emit("chat_message", { sender: "Sistema", text: `🃏 ${player.name} lançou ${card.name}${target ? ` contra ${target.name}` : ""}!` });
 
         // Slavery restriction: slave must play benefit card if they have one
         if (player.isSlaveOf && card.type !== "benefit") {

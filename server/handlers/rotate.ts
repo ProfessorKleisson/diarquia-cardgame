@@ -22,7 +22,7 @@ export function registerRotateHandlers(socket: Socket) {
 
         room.pendingRotateSelection.selections[socket.id] = selectedCardId;
 
-        io.to(roomId).emit("chat_message", { sender: "Sistema", text: `✅ ${player.name} escolheu uma carta para passar.` });
+        io.to(roomId).emit("chat_message", { sender: "Sistema", text: `✅ ${player.name} preparou sua carta.` });
         io.to(roomId).emit("room_update", room);
 
         const submitted = Object.keys(room.pendingRotateSelection.selections).length;
