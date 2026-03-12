@@ -180,10 +180,22 @@ export function applyCardEffect(room: Room, player: Player, card: Card, targetPl
             break;
 
         case "draw_2_or_block":
-        case "draw_2_or_block_unblockable":
-            player.hand.push(...room.deck.splice(0, 2));
-            io.to(room.id).emit("chat_message", { sender: "Sistema", text: `📜 Pacto de Defesa! ${player.name} reforçou sua mão com 2 novas cartas.` });
+        case "draw_2_or_block_unblockable": {
+            const drawn: Card[] = room.deck.splice(0, 2);
+            player.hand.push(...drawn);
+
+            // Animations for each drawn card
+            drawn.forEach(card => {
+                io.to(player.id).emit("play_animation", { type: "draw", attackerName: player.name, targetCard: card, targetName: player.name });
+                io.to(room.id).except(player.id).emit("play_animation", { type: "draw", attackerName: player.name, targetCard: null, targetName: player.name });
+            });
+
+            io.to(room.id).emit("chat_message", {
+                sender: "Sistema",
+                text: `📜 Pacto de Defesa! ${player.name} usou ${card.name} para reforçar sua mão com 2 novas cartas.`
+            });
             break;
+        }
 
         case "slavery":
             if (target) {
